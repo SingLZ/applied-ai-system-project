@@ -13,3 +13,7 @@ venv/
 
 # Pytest cache
 .pytest_cache/
+
+# Runtime audit logs
+logs/*.jsonl
+!logs/.gitkeep

@@ -136,7 +136,7 @@ def main() -> None:
         print("-"*70)
         
         for i, (song, score, explanation) in enumerate(recs_exp, 1):
-            print(f"\n{i}. {song['title']} - Score: {score:.2f}/10.0")
+            print(f"\n{i}. {song['title']} - Score: {score:.2f}/7.0")
             for line in explanation.split("\n"):
                 print(f"   • {line}")
 

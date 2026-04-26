@@ -156,7 +156,7 @@ def main() -> None:
             print(f"\n{i}. {song['title']}")
             print(f"   Artist: {song['artist']}")
             print(f"   Genre: {song['genre']}")
-            print(f"   Score: {score:.2f}/10.0")
+            print(f"   Score: {score:.2f}/7.0")
             print(f"   Details:")
             
             # Handle both string and list explanations
