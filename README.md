@@ -30,22 +30,35 @@ This feature is integrated directly into the main recommendation flow. When the 
 ```mermaid
 flowchart TD
     A[User Taste Profile] --> B[Input Guardrail Validator]
-    B --> C[Song Catalog Loader]
+    B -->|Valid profile| C[Song Catalog Loader]
+    B -->|Invalid profile| X[Clear Validation Error]
     C --> D[Weighted Scoring Engine]
-    D --> E[Confidence Scorer]
-    E --> F[Diversity and Bias Checker]
-    F --> G[Explanation Generator]
-    G --> H[Audit Logger]
-    H --> I[Ranked Recommendations + Reliability Summary]
+    D --> E[Ranked Song Candidates]
+    E --> F[Confidence Scorer]
+    F --> G[Diversity and Bias Checker]
+    G --> H[Explanation Generator]
+    H --> I[Audit Logger]
+    I --> J[Ranked Recommendations + Reliability Summary]
 
-    J[Pytest Reliability Tests] --> B
-    J --> D
-    J --> E
-    J --> F
+    T[Agent Workflow Trace] -. observes .-> B
+    T -. observes .-> C
+    T -. observes .-> D
+    T -. observes .-> F
+    T -. observes .-> G
+    T -. observes .-> I
+
+    K[Pytest Reliability Tests] --> B
+    K --> D
+    K --> F
+    K --> G
+
+    L[Bonus Evaluation Harness] --> B
+    L --> D
+    L --> M[Pass/Fail + Confidence Report]
 ```
 
+Mermaid Chart
 ![System architecture diagram](mermaid-chart.png)
-
 ### Data Flow
 
 1. The user profile specifies preferred genre, mood, target energy, and acoustic preference.
@@ -152,6 +165,12 @@ python -m src.main
 pytest
 ```
 
+### 6. Run the bonus evaluation harness
+
+```bash
+python scripts/run_evaluation.py
+```
+
 ## Sample Interactions
 
 ### Example 1: Chill Lofi Listener
@@ -217,6 +236,39 @@ RELIABILITY SUMMARY:
   • Low-confidence warning: at least one recommendation scored below 0.60 confidence.
 ```
 
+## Bonus Features Implemented
+
+### +2 Test Harness / Evaluation Script
+
+The project now includes `scripts/run_evaluation.py`, a dedicated evaluation harness that runs the real recommender against predefined valid profiles, invalid guardrail inputs, and an empty-catalog case. It prints pass/fail results, average confidence, guardrail pass counts, low-confidence cases, and an overall status.
+
+Sample output:
+
+```text
+=== Reliability Evaluation Harness ===
+Valid profile passes: 8/8
+Guardrail tests passed: 3/3
+Empty catalog test passed: 1/1
+Average confidence: 0.72
+Overall status: PASS
+```
+
+### +2 Agentic Workflow Enhancement
+
+Each recommendation run now includes an observable `agent_trace`. The trace records the system's intermediate decision steps: profile validation, catalog retrieval, candidate scoring, confidence checking, diversity/reliability checking, explanation generation, and audit logging. This makes the recommender's process inspectable instead of only showing final recommendations.
+
+Example trace:
+
+```text
+[PASS] Validate profile: User profile passed all guardrails.
+[PASS] Retrieve catalog: 20 candidate songs loaded for scoring.
+[PASS] Score candidates: Scored 20 songs and selected 5 recommendation(s).
+[WARN] Confidence check: Average confidence=0.72; lowest confidence=0.49.
+[WARN] Diversity and reliability check: genre 'pop' appears 3/5 times.
+[PASS] Generate explanations: Generated 5 explanation(s).
+[PASS] Audit log: Audit record written to logs/recommendation_audit.jsonl.
+```
+
 ## Logging
 
 Each recommendation run writes a JSONL audit record to:
@@ -264,7 +316,13 @@ The tests cover:
 Current expected result:
 
 ```text
-6 tests passing
+8 tests passing
+```
+
+The bonus harness can also be run with:
+
+```bash
+python scripts/run_evaluation.py
 ```
 
 The main reliability run evaluates 8 user profiles. In the latest run, all 8 profiles passed guardrails. Average confidence was approximately `0.72`, and the system flagged lower-confidence profiles where the small catalog lacked enough matching songs.
@@ -357,9 +415,10 @@ This shows how repeated artist or genre penalties can change the top recommendat
 |---|---|
 | `src/recommender.py` | Core scoring, guardrails, confidence, logging, and reliability logic |
 | `src/main.py` | Main CLI app and multi-profile reliability run |
+| `scripts/run_evaluation.py` | Bonus evaluation harness with pass/fail and confidence reporting |
 | `src/main_experiment.py` | Weight sensitivity experiment |
 | `src/main_diversity.py` | Diversity penalty experiment |
-| `tests/test_recommender.py` | Automated tests |
+| `tests/test_recommender.py` | Automated tests for recommendations, guardrails, confidence, and agent trace |
 | `data/songs.csv` | Song catalog |
 | `model_card.md` | Detailed model card and reflection |
 | `PROFILE_COMPARISON_ANALYSIS.md` | Additional profile comparison notes |

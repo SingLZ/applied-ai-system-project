@@ -132,6 +132,11 @@ def main() -> None:
 
         run = recommend_songs_with_reliability(user_prefs, songs, k=5)
 
+        print("\nAGENT WORKFLOW TRACE:")
+        print("-" * 78)
+        for step in run.agent_trace:
+            print(f"  [{step.status}] {step.step}: {step.detail}")
+
         print("\nTOP 5 RECOMMENDATIONS:")
         print("-" * 78)
         print(format_recommendations_table(run.recommendations, profile_name))

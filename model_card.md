@@ -62,7 +62,9 @@ It includes:
 - diversity warnings for repeated artists or genres
 - low-confidence warnings
 - JSONL audit logging
+- observable agent workflow trace
 - multi-profile reliability evaluation
+- bonus evaluation harness with pass/fail reporting
 
 This is part of the main recommender behavior, not a standalone script.
 
@@ -102,8 +104,10 @@ Automated tests cover:
 - invalid energy rejection
 - invalid `k` rejection
 - empty catalog behavior
+- observable agent trace steps
+- empty-catalog trace warnings
 
-The main CLI evaluates 8 user profiles and prints an overall reliability report.
+The main CLI evaluates 8 user profiles and prints an overall reliability report. The bonus `scripts/run_evaluation.py` harness runs valid profiles, invalid guardrail inputs, and empty-catalog behavior, then prints a pass/fail summary.
 
 Latest observed reliability result:
 
@@ -139,6 +143,7 @@ Prevention methods in this project:
 - Add semantic tags for lyrics or themes.
 - Replace exact genre matching with embeddings or similarity scores.
 - Add a configurable diversity penalty directly into the main ranking function.
+- Add optional RAG-style retrieval from listening notes or genre documentation.
 
 ## 12. Reflection
 

@@ -128,3 +128,35 @@ def test_invalid_k_is_rejected():
 
     with pytest.raises(ValueError, match="positive integer"):
         rec.recommend(user, k=0)
+
+
+def test_agent_trace_contains_observable_steps():
+    user = {
+        "genre": "pop",
+        "mood": "happy",
+        "energy": 0.8,
+        "likes_acoustic": False,
+    }
+    run = recommend_songs_with_reliability(user, make_song_dicts(), k=2, audit_log_path=None)
+    trace_steps = [step.step for step in run.agent_trace]
+
+    assert "Validate profile" in trace_steps
+    assert "Retrieve catalog" in trace_steps
+    assert "Score candidates" in trace_steps
+    assert "Confidence check" in trace_steps
+    assert "Diversity and reliability check" in trace_steps
+    assert "Generate explanations" in trace_steps
+    assert "Audit log" in trace_steps
+
+
+def test_agent_trace_records_empty_catalog_warning():
+    user = {
+        "genre": "pop",
+        "mood": "happy",
+        "energy": 0.8,
+        "likes_acoustic": False,
+    }
+    run = recommend_songs_with_reliability(user, [], k=2, audit_log_path=None)
+
+    assert any(step.status == "WARN" for step in run.agent_trace)
+    assert any("empty" in step.detail.lower() for step in run.agent_trace)

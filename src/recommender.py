@@ -69,11 +69,21 @@ class ReliabilitySummary:
 
 
 @dataclass(frozen=True)
+class AgentTraceStep:
+    """Observable intermediate step from the recommendation workflow."""
+
+    step: str
+    status: str
+    detail: str
+
+
+@dataclass(frozen=True)
 class RecommendationRun:
     """Full recommendation response: recommendations plus reliability metadata."""
 
     recommendations: List[RecommendationResult]
     reliability: ReliabilitySummary
+    agent_trace: List[AgentTraceStep]
 
 
 ProfileInput = Union[UserProfile, Mapping[str, Any]]
@@ -97,20 +107,23 @@ class Recommender:
         k: int = 5,
         audit_log_path: Optional[str] = DEFAULT_AUDIT_LOG_PATH,
     ) -> RecommendationRun:
-        """Return recommendations with confidence, guardrails, warnings, and logging."""
+        """Return recommendations with confidence, guardrails, warnings, logging, and trace steps."""
+        trace: List[AgentTraceStep] = []
         normalized_user = validate_user_profile(user, k)
-        results = _rank_song_objects(normalized_user, self.songs, k)
-        summary = build_reliability_summary(results)
-
-        if audit_log_path is not None:
-            log_recommendation_run(
-                profile=normalized_user,
-                recommendations=results,
-                summary=summary,
-                audit_log_path=audit_log_path,
+        trace.append(
+            AgentTraceStep(
+                step="Validate profile",
+                status="PASS",
+                detail="User profile passed all guardrails.",
             )
-
-        return RecommendationRun(recommendations=results, reliability=summary)
+        )
+        return _build_recommendation_run(
+            user=normalized_user,
+            songs=self.songs,
+            k=k,
+            audit_log_path=audit_log_path,
+            trace=trace,
+        )
 
     def _score_song_oop(self, user: UserProfile, song: Song) -> float:
         """Score a single song against a user profile."""
@@ -194,20 +207,23 @@ def recommend_songs_with_reliability(
     audit_log_path: Optional[str] = DEFAULT_AUDIT_LOG_PATH,
 ) -> RecommendationRun:
     """Functional API that returns recommendations plus integrated reliability data."""
+    trace: List[AgentTraceStep] = []
     user = validate_user_profile(user_prefs, k)
-    song_objects = [_song_dict_to_dataclass(song) for song in songs]
-    results = _rank_song_objects(user, song_objects, k)
-    summary = build_reliability_summary(results)
-
-    if audit_log_path is not None:
-        log_recommendation_run(
-            profile=user,
-            recommendations=results,
-            summary=summary,
-            audit_log_path=audit_log_path,
+    trace.append(
+        AgentTraceStep(
+            step="Validate profile",
+            status="PASS",
+            detail="User profile passed all guardrails.",
         )
-
-    return RecommendationRun(recommendations=results, reliability=summary)
+    )
+    song_objects = [_song_dict_to_dataclass(song) for song in songs]
+    return _build_recommendation_run(
+        user=user,
+        songs=song_objects,
+        k=k,
+        audit_log_path=audit_log_path,
+        trace=trace,
+    )
 
 
 def evaluate_reliability(
@@ -327,7 +343,8 @@ def log_recommendation_run(
     recommendations: List[RecommendationResult],
     summary: ReliabilitySummary,
     audit_log_path: str = DEFAULT_AUDIT_LOG_PATH,
-) -> None:
+    agent_trace: Optional[List[AgentTraceStep]] = None,
+) -> bool:
     """Append a JSONL audit record. Logging failures do not crash recommendation."""
     try:
         directory = os.path.dirname(audit_log_path)
@@ -344,12 +361,108 @@ def log_recommendation_run(
             "guardrail_status": summary.guardrail_status,
             "warnings": summary.warnings,
             "recommendation_count": summary.recommendation_count,
+            "agent_trace": [asdict(step) for step in agent_trace or []],
         }
 
         with open(audit_log_path, "a", encoding="utf-8") as file:
             file.write(json.dumps(record, ensure_ascii=False) + "\n")
+        return True
     except OSError as exc:
         print(f"Warning: recommendation audit log was not written: {exc}")
+        return False
+
+
+def _build_recommendation_run(
+    user: UserProfile,
+    songs: List[Song],
+    k: int,
+    audit_log_path: Optional[str],
+    trace: List[AgentTraceStep],
+) -> RecommendationRun:
+    """Execute the observable multi-step recommendation workflow."""
+    if songs:
+        trace.append(
+            AgentTraceStep(
+                step="Retrieve catalog",
+                status="PASS",
+                detail=f"{len(songs)} candidate songs loaded for scoring.",
+            )
+        )
+    else:
+        trace.append(
+            AgentTraceStep(
+                step="Retrieve catalog",
+                status="WARN",
+                detail="Song catalog is empty; returning no recommendations.",
+            )
+        )
+
+    results = _rank_song_objects(user, songs, k)
+    trace.append(
+        AgentTraceStep(
+            step="Score candidates",
+            status="PASS" if results else "WARN",
+            detail=f"Scored {len(songs)} songs and selected {len(results)} recommendation(s).",
+        )
+    )
+
+    summary = build_reliability_summary(results)
+    trace.append(
+        AgentTraceStep(
+            step="Confidence check",
+            status="PASS" if summary.average_confidence >= 0.75 else "WARN",
+            detail=(
+                f"Average confidence={summary.average_confidence:.2f}; "
+                f"lowest confidence={summary.lowest_confidence:.2f}."
+            ),
+        )
+    )
+
+    trace.append(
+        AgentTraceStep(
+            step="Diversity and reliability check",
+            status="WARN" if summary.warnings else "PASS",
+            detail="; ".join(summary.warnings) if summary.warnings else "No diversity or low-confidence warnings.",
+        )
+    )
+
+    trace.append(
+        AgentTraceStep(
+            step="Generate explanations",
+            status="PASS" if all(result.explanation.strip() for result in results) else "WARN",
+            detail=f"Generated {len(results)} explanation(s).",
+        )
+    )
+
+    if audit_log_path is not None:
+        log_written = log_recommendation_run(
+            profile=user,
+            recommendations=results,
+            summary=summary,
+            audit_log_path=audit_log_path,
+            agent_trace=trace,
+        )
+        trace.append(
+            AgentTraceStep(
+                step="Audit log",
+                status="PASS" if log_written else "WARN",
+                detail=(
+                    f"Audit record written to {audit_log_path}."
+                    if log_written
+                    else f"Audit record could not be written to {audit_log_path}."
+                ),
+            )
+        )
+    else:
+        trace.append(
+            AgentTraceStep(
+                step="Audit log",
+                status="SKIP",
+                detail="Audit logging disabled for this run.",
+            )
+        )
+
+    return RecommendationRun(recommendations=results, reliability=summary, agent_trace=trace)
 
 
 def _rank_song_objects(user: UserProfile, songs: List[Song], k: int) -> List[RecommendationResult]:
