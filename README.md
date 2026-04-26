@@ -44,6 +44,8 @@ flowchart TD
     J --> F
 ```
 
+![System architecture diagram](mermaid-chart.png)
+
 ### Data Flow
 
 1. The user profile specifies preferred genre, mood, target energy, and acoustic preference.
