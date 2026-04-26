@@ -422,3 +422,27 @@ This shows how repeated artist or genre penalties can change the top recommendat
 | `data/songs.csv` | Song catalog |
 | `model_card.md` | Detailed model card and reflection |
 | `PROFILE_COMPARISON_ANALYSIS.md` | Additional profile comparison notes |
+
+## Demo Walkthrough
+
+### End-to-End Recommendation Run
+
+[Watch end-to-end CLI demo video](Assets/main-output.mov)
+
+### Bonus Evaluation Harness
+
+![Evaluation harness output](Assets/evaluation-output.png)
+
+## Video Walkthrough
+
+[![Watch the project walkthrough](https://img.youtube.com/vi/VHA-mM9W0SA/hqdefault.jpg)](https://www.youtube.com/watch?v=VHA-mM9W0SA)
+
+The walkthrough demonstrates:
+- End-to-end system run with multiple user profiles
+- Agent workflow trace and confidence scoring
+- Reliability summary and guardrail behavior
+- Evaluation harness output
+
+## Portfolio Reflection
+
+This project shows my ability to build an AI system beyond a basic prototype. I started with a simple content-based music recommender and extended it into a more responsible applied AI system with guardrails, confidence scoring, explainable outputs, agent-style workflow tracing, audit logging, and an evaluation harness. As an AI engineer, this project reflects my focus on building systems that are not only functional, but also testable, transparent, and safer to use.
